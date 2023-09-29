@@ -45,9 +45,9 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => AppBloc(
-        loginApi: LoginApi(),
-        notesApi: NotesAPi(),
-      ),
+          loginApi: LoginApi(),
+          notesApi: NotesAPi(),
+          acceptableLoginHandle: const LoginHandle.foobar()),
       child: Scaffold(
         appBar: AppBar(
           title: const Text(homePage),
