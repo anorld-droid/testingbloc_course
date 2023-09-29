@@ -1,13 +1,17 @@
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'dart:developer' as devtools show log;
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:testingbloc_course/bloc/bloc_actions.dart';
-import 'package:testingbloc_course/bloc/persons_bloc.dart';
-
-import 'bloc/person.dart';
+import 'package:testingbloc_course/apis/login_api.dart';
+import 'package:testingbloc_course/apis/notes_api.dart';
+import 'package:testingbloc_course/bloc/actions.dart';
+import 'package:testingbloc_course/bloc/app_bloc.dart';
+import 'package:testingbloc_course/bloc/app_state.dart';
+import 'package:testingbloc_course/dialogs/generic_dialog.dart';
+import 'package:testingbloc_course/dialogs/loading_screen.dart';
+import 'package:testingbloc_course/models.dart';
+import 'package:testingbloc_course/strings.dart';
+import 'package:testingbloc_course/views/iterable_listview.dart';
+import 'package:testingbloc_course/views/login_view.dart';
 
 extension Log on Object {
   void log() => devtools.log(toString());
@@ -29,95 +33,70 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: BlocProvider(
-        create: (_) => PersonsBloc(),
-        child: const HomePage(),
-      ),
+      home: const HomePage(),
     );
   }
 }
 
-Future<Iterable<Person>> getPersons(String url) => HttpClient()
-    .getUrl(Uri.parse(url))
-    .then((req) => req.close())
-    .then((resp) => resp.transform(utf8.decoder).join())
-    .then((str) => json.decode(str) as List<dynamic>)
-    .then((list) => list.map((e) => Person.fromJson(e)));
-
-extension Subscript<T> on Iterable<T> {
-  T? operator [](int index) => length > index ? elementAt(index) : null;
-}
-
-class HomePage extends StatefulWidget {
+class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Flutter Demo Home Page'"),
+    return BlocProvider(
+      create: (_) => AppBloc(
+        loginApi: LoginApi(),
+        notesApi: NotesAPi(),
       ),
-      body: Column(
-        children: [
-          Row(
-            children: [
-              TextButton(
-                onPressed: () {
-                  context.read<PersonsBloc>().add(
-                        const LoadPersonsAction(
-                            url: persons1, loader: getPersons),
-                      );
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text(homePage),
+        ),
+        body: BlocConsumer<AppBloc, AppState>(
+          builder: (context, appState) {
+            final notes = appState.fetchedNotes;
+            if (notes == null) {
+              return LoginView(
+                onLoginTapped: (email, password) {
+                  context
+                      .read<AppBloc>()
+                      .add(LoginAction(email: email, password: password));
                 },
-                child: const Text('Load Json #1'),
-              ),
-              TextButton(
-                onPressed: () {
-                  context.read<PersonsBloc>().add(
-                        const LoadPersonsAction(
-                            url: persons2, loader: getPersons),
-                      );
-                },
-                child: const Text('Load Json #2'),
-              ),
-            ],
-          ),
-          BlocBuilder<PersonsBloc, FetchResults?>(
-            buildWhen: (previous, current) =>
-                previous?.persons != current?.persons,
-            builder: ((context, fetchResults) {
-              fetchResults?.log();
-              final persons = fetchResults?.persons;
-              if (persons == null) {
-                return const SizedBox();
-              }
-              return Expanded(
-                  child: ListView.builder(
-                itemCount: persons.length,
-                itemBuilder: (context, index) {
-                  final person = persons[index]!;
-                  return ListTile(
-                    title: Text(person.name),
-                  );
-                },
-              ));
-            }),
-          )
-        ],
+              );
+            } else {
+              return notes.toListView();
+            }
+          },
+          listener: (context, appState) {
+            //Loading screen
+            if (appState.isLoading) {
+              LoadingScreen.instance().show(
+                context: context,
+                text: pleaseWait,
+              );
+            } else {
+              LoadingScreen.instance().hide();
+            }
+
+            //Display errors
+            final loginError = appState.loginError;
+            if (loginError != null) {
+              showGenericDialog<bool>(
+                context: context,
+                title: loginErrorDialogTitle,
+                content: loginErrorDialogContent,
+                optionsBuilder: () => {ok: true},
+              );
+            }
+            //If we're loggedin and we have no notes fetch them
+            if (appState.isLoading == false &&
+                appState.loginError == null &&
+                appState.loginHandle == const LoginHandle.foobar() &&
+                appState.fetchedNotes == null) {
+              context.read<AppBloc>().add(const LoadNotesAction());
+            }
+          },
+        ),
       ),
     );
   }
