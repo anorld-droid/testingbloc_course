@@ -10,7 +10,7 @@ abstract class AppState {
 
   const AppState({
     required this.isLoading,
-    required this.authError,
+    this.authError,
   });
 }
 
@@ -22,7 +22,7 @@ class AppStateLoggedIn extends AppState {
     required this.user,
     required this.images,
     required super.isLoading,
-    required super.authError,
+    super.authError,
   });
 
   @override
@@ -48,7 +48,7 @@ class AppStateLoggedIn extends AppState {
 class AppStateLoggedOut extends AppState {
   const AppStateLoggedOut({
     required super.isLoading,
-    required super.authError,
+    super.authError,
   });
 
   @override
@@ -60,6 +60,28 @@ class AppStateLoggedOut extends AppState {
 class AppStateIsInRegistrationVIew extends AppState {
   const AppStateIsInRegistrationVIew({
     required super.isLoading,
-    required super.authError,
+    super.authError,
   });
+}
+
+extension GetUser on AppState {
+  User? get user {
+    final cls = this;
+    if (cls is AppStateLoggedIn) {
+      return cls.user;
+    } else {
+      return null;
+    }
+  }
+}
+
+extension GetImages on AppState {
+  Iterable<Reference>? get images {
+    final cls = this;
+    if (cls is AppStateLoggedIn) {
+      return cls.images;
+    } else {
+      return null;
+    }
+  }
 }
